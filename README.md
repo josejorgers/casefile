@@ -56,3 +56,9 @@ The DA, the judge and confrontations all run the same rules over the cards you s
 - `src/interview.ts`: questions, statements, confrontation
 - `src/da.ts`: the DA's verdict and the judge's warrants
 - `src/ui/board.ts`, `src/ui/view.ts`: the corkboard and the rest of the UI
+
+## Contributing
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+[MIT](LICENSE) © José Jorge Rodríguez
