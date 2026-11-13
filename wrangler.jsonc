@@ -1,0 +1,6 @@
+{
+  "name": "casefile",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" },
+  "routes": [{ "pattern": "casefile.jayjaydev.com", "custom_domain": true }]
+}
