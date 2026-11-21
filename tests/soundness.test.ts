@@ -4,10 +4,13 @@
 //  2. Play-through: a detective who follows the shortest proof using real game actions (taking items, lab work,
 //     asking, confronting with cards, warrants) gets charges filed by the DA.
 //  3. The same detective, naming each innocent person instead with every card they gathered, never succeeds.
+//  4. Optional help: a detective who only follows the "next step" hints gets charges filed, and no hint ever
+//     points at something unreachable or repeats without progress.
 import { describe, expect, it } from 'vitest';
 import { checkCase } from '../src/crime';
 import { DIFFICULTIES } from '../src/data';
-import { evaluateCase, submitCase } from '../src/da';
+import { evaluateCase, evaluateWarrant, submitCase } from '../src/da';
+import { nextStep } from '../src/help';
 import { ask, confront } from '../src/interview';
 import { analyse, omniscientEvidence } from '../src/logic/analyse';
 import { sources } from '../src/logic/engine';
@@ -111,6 +114,79 @@ describe('Case soundness', () => {
         }
       }
       expect(cases).toBeGreaterThan(60);
+    }, 600_000);
+  }
+});
+
+/** Carry out one hint with real game actions. */
+function follow(a: ReturnType<typeof nextStep>['action'], label: string) {
+  const c = curCase();
+  switch (a.do) {
+    case 'take': readItem(a.item); K.taken[a.item] = true; card('item', a.item); return;
+    case 'bodyprints': bodyPrints(a.item); return;
+    case 'lab':
+      if (a.test === 'bal') ballistics(a.a, a.b!);
+      else if (a.test === 'blood') bloodTest(a.a);
+      else if (a.test === 'coroner') coronerReport(a.a);
+      else if (a.test === 'type') compareType(a.a, a.b!);
+      else if (a.test === 'hand') compareHand(a.a, a.b!);
+      else dustItem(a.a);
+      return;
+    case 'dust-spot': dustSpot(a.spot); return;
+    case 'pin-print': expect(K.printFound[a.pid], `${label}: print not found yet`).toBeTruthy(); card('print', a.pid); return;
+    case 'pin-statement': expect(K.statements[a.id], label).toBeTruthy(); card('statement', a.id); return;
+    case 'ask': {
+      const r = ask(a.pid, a.q);
+      expect(r.refused, `${label}: ${a.pid} refused ${a.q}`).toBeFalsy();
+      if (r.statement) card('statement', r.statement.id);
+      return;
+    }
+    case 'warrant':
+      expect(evaluateWarrant(a.pid, a.cards).granted, `${label}: warrant denied`).toBe(true);
+      K.warrants[`${c.id}:${a.pid}`] = true;
+      return;
+    case 'confront': {
+      const r = confront(a.stmt, a.cards);
+      expect(r.ok, `${label}: confrontation failed`).toBe(true);
+      if (r.statement) card('statement', r.statement.id);
+      return;
+    }
+    default: throw new Error(`${label}: unexpected hint ${JSON.stringify(a)}`);
+  }
+}
+
+describe('Optional help', () => {
+  for (const diff of DIFFS) {
+    it(`${diff}: following the next-step hints solves the case`, () => {
+      let cases = 0;
+      for (let seed = 1; seed <= 8; seed++) {
+        newWorld(seed * 104729);
+        for (let round = 0; round < 2; round++) {
+          const c = startNewCase(diff);
+          if (!c) break;
+          cases++;
+          let prev = '';
+          for (let step = 0; ; step++) {
+            const label = `seed ${seed} case ${c.id} (${diff}) step ${step}`;
+            expect(step, `${label}: too many hints`).toBeLessThan(150);
+            const h = nextStep();
+            const key = JSON.stringify(h.action);
+            expect(key, `${label}: hint repeated without progress: ${h.text}`).not.toBe(prev);
+            prev = key;
+            if (h.action.do === 'file') {
+              // Survives a save/load round trip: the hint is the same after reloading.
+              K.board = JSON.parse(JSON.stringify(K.board));
+              expect(JSON.stringify(nextStep().action)).toBe(key);
+              K.form = { victim: card('person', c.victim), suspect: card('person', c.killer), weapon: null, evidence: h.action.cards };
+              const r = submitCase();
+              expect(r.ok, `${label}: DA declined: ${JSON.stringify(r.notes)}`).toBe(true);
+              break;
+            }
+            follow(h.action, `${label}: ${h.text}`);
+          }
+        }
+      }
+      expect(cases).toBeGreaterThan(10);
     }, 600_000);
   }
 });

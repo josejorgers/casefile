@@ -346,6 +346,14 @@ The DA (`evaluateCase`), the judge (`evaluateWarrant`) and confrontations (`conf
 
 The board itself is free-form. Links between cards mean nothing to the game.
 
+### 5.1 Optional help (`src/help.ts`)
+
+The "Stuck? Get help" button offers three levels, each behind a confirmation: the next step, the killer's name, and the full proof (`Case.proof`). Use is recorded in `Case.help` and shown on the closed case; nothing else changes.
+
+**Next step** runs the omniscient analysis again, but with every piece of evidence the detective already holds (on the board, with its lab work done) costed at 0, via the `discount` hook of `analyse()`. The cheapest proof of `guilty(killer)` is then the one closest to the detective's board. A depth-first walk of that proof, prerequisites first, finds the first piece of evidence still missing and turns it into one concrete action: take an item, run a lab test, dust a spot, pin a print, ask a question, confront a statement with the cards that break it, or apply for a warrant (working towards the judge's two connections if the board doesn't have them yet). The reason comes from the rule that consumes the evidence and never names anyone. Statements from people who have lawyered up are left out, so the hint never points at something unreachable. When nothing is missing, the hint says to file with the DA and lists the cards.
+
+The soundness test follows the hints alone with real game actions until the DA charges, and fails if a hint ever repeats without progress.
+
 ---
 
 ## 6. Extending the language

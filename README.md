@@ -19,6 +19,8 @@ Crimes are described in a small **case language**: facts (`claim(P, place, from,
 
 The DA, the judge and confrontations all run the same rules over the cards you submit, so anything the language can derive, the game understands. Once a case is closed you can see the shortest proof that existed.
 
+**Stuck?** An optional help button offers, each behind a confirmation: the next step and why it matters (computed from the cheapest proof given what's already on your board), the killer's name, or the full proof. The DA still needs the evidence; help used is noted on the closed case.
+
 ## Deductions in the language
 - **Time of death**: the coroner's wide window, narrowed by a call the victim answered, a smashed watch, a neighbour who heard the shot.
 - **Locked doors and elimination**: the door was locked with a key, so the killer is a key holder. Rule out every other key holder with a record that covers the time of death, optionally filtered by a witness's description.
@@ -55,6 +57,7 @@ The DA, the judge and confrontations all run the same rules over the cards you s
 - `src/docs.ts`: document text
 - `src/interview.ts`: questions, statements, confrontation
 - `src/da.ts`: the DA's verdict and the judge's warrants
+- `src/help.ts`: optional help (next step, killer, full proof)
 - `src/ui/board.ts`, `src/ui/view.ts`: the corkboard and the rest of the UI
 
 ## Contributing

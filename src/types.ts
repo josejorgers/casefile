@@ -128,6 +128,8 @@ export interface Case {
   /** The shortest proof of guilt that exists in the world, rendered as indented lines (shown once the case is closed). */
   proof: string[];
   minCost: number;
+  /** Optional help the detective used on this case (next-step hints, killer revealed, full proof revealed). */
+  help?: { steps: number; killer: boolean; proof: boolean };
 }
 
 export interface World {

@@ -19,11 +19,17 @@ function gateRule(W: World, c: Case, gated: { st: Statement; after: string }[]):
   };
 }
 
-export function analyse(W: World, c: Case, ev: Evidence): DB {
+/**
+ * `discount` (optional) may lower the cost of facts after each saturation, e.g. to 0 for evidence the detective
+ * already holds; derived facts are then re-costed so the cheapest derivation prefers that evidence.
+ */
+export function analyse(W: World, c: Case, ev: Evidence, discount?: (db: DB) => boolean): DB {
   setContext(W, c);
   const db = new DB();
   observe(W, c, ev, db);
-  saturate(db, [...RULES, gateRule(W, c, ev.gated)]);
+  const rules = [...RULES, gateRule(W, c, ev.gated)];
+  saturate(db, rules);
+  for (let i = 0; discount && i < 10 && discount(db); i++) saturate(db, rules);
   return db;
 }
 

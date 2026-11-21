@@ -3,6 +3,8 @@ import { BUSINESS_TYPES, DIFFICULTIES, MOTIVE_LABEL, cap, esc, fmtDate, fmtTime,
 import { IDENTIFYING, PILLAR_LABEL, evaluateWarrant, submitCase } from '../da';
 import type { Pillar, Verdict, WarrantRuling } from '../da';
 import { docText, plain } from '../docs';
+import { helpSummary, nextStep, recordHelp } from '../help';
+import type { Hint, HelpLevel } from '../help';
 import type { ProofNode } from '../logic/engine';
 import { QUESTIONS, QUESTION_ORDER, STATEMENT_LABEL, ask, confront, hasWarrant, isLawyered, sid } from '../interview';
 import {
@@ -27,6 +29,7 @@ let lastConfront: Record<string, string> = {};
 let warrantRuling: WarrantRuling | null = null;
 let confrontReply: { stmt: string; text: string; ok: boolean } | null = null;
 let pendingSeed: number | null = null;
+let helpShown: { case: number; level: HelpLevel; hint?: Hint } | null = null;
 
 const ITEM_TYPE: Record<ItemKind, string> = {
   weapon: 'Weapon', body: 'Body', bullet: 'Ballistic evidence', shoeprint: 'Shoe print', shoes: 'Shoes',
@@ -145,7 +148,7 @@ function renderHeader() {
   const c = curCase();
   $('#caseTitle').innerHTML = `Case #${c.id} — Homicide · ${esc(addrName(c.scene))} · ${fmtDate(c.day)} `
     + `<span class="badge diff-${c.difficulty}">${DIFFICULTIES[c.difficulty].label.toUpperCase()}</span>`
-    + (c.solved ? '<span class="badge ok">CLOSED</span>' : '<span class="badge">OPEN</span>');
+    + (c.solved ? '<span class="badge ok">CLOSED</span>' : '<span class="badge">OPEN</span> <button class="help-btn" data-act="open-help">Stuck? Get help</button>');
 }
 export function switchTab(t: Tab) {
   tab = t;
@@ -250,7 +253,7 @@ function renderReport() {
   const el = $('#tab-report'), c = curCase(), f = K.form, cards = Object.values(K.board.cards);
   if (c.solved) {
     el.innerHTML = `<div class="closed"><h2>Case #${c.id} closed</h2><p>${esc(fullName(c.killer))} has been charged with the murder of ${esc(fullName(c.victim))}.</p>`
-      + `<p class="muted">DA submissions: ${c.attempts}</p><button class="primary" data-act="pick-case">Take the next case</button></div>`
+      + `<p class="muted">DA submissions: ${c.attempts} · ${esc(helpSummary(c))}</p><button class="primary" data-act="pick-case">Take the next case</button></div>`
       + proofBox(c.proof);
     return;
   }
@@ -276,9 +279,9 @@ function proofTree(n: ProofNode, depth = 0): string {
   const kids = n.children.length ? `<ul>${n.children.map(ch => `<li>${proofTree(ch, depth + 1)}</li>`).join('')}</ul>` : '';
   return `<span class="${n.children.length ? '' : 'leaf'}">${esc(n.text)}</span>${kids}`;
 }
-function proofBox(lines: string[]): string {
+function proofBox(lines: string[], open = false): string {
   if (!lines.length) return '';
-  return `<details class="proof"><summary>The shortest proof that existed</summary><div class="lines">${lines.map(l => {
+  return `<details class="proof"${open ? ' open' : ''}><summary>The shortest proof that existed</summary><div class="lines">${lines.map(l => {
     const depth = l.length - l.trimStart().length;
     return `<div style="padding-left:${depth * 7}px">${esc(l.trim())}</div>`;
   }).join('')}</div></details>`;
@@ -298,7 +301,7 @@ function showVerdict(r: Verdict) {
   if (r.ok) {
     const k = person(c.killer);
     h += `<div class="box"><b>What happened.</b> ${esc(fullName(c.killer))} killed ${esc(fullName(c.victim))} at about ${fmtTime(c.time)} with a ${esc(c.weaponName.toLowerCase())}. Motive: ${MOTIVE_LABEL[c.motive]}.`
-      + ` ${cap(pron(k).subj)} is now in custody. Submissions to the DA: ${c.attempts}.</div>`
+      + ` ${cap(pron(k).subj)} is now in custody. Submissions to the DA: ${c.attempts}. ${esc(helpSummary(c))}</div>`
       + proofBox(c.proof)
       + '<div class="row"><button class="primary" data-act="pick-case">Take the next case</button></div>';
   } else h += '<p class="muted">The DA needs 3 of the 4 pillars. Keep investigating.</p>';
@@ -326,6 +329,39 @@ function renderHelp() {
   <ul><li>Drag cards; drag the background to pan; scroll to zoom.</li><li>Shift-click a second card (or use "Link to…") to tie a string. Click a string to cut it.</li>
   <li>Double-click a card to open it. Add notes and "unknown person" cards for leads without a name.</li></ul>
   <h4>Case log</h4><div class="log">${K.log.map(l => `<div><span class="muted">${fmtDate(l.day)}</span> ${esc(l.msg)}</div>`).join('')}</div>`;
+}
+
+// ---------- Optional help (each level behind a confirmation)
+const HELP_LEVELS: { level: HelpLevel; label: string; blurb: string; confirm: string }[] = [
+  { level: 'step', label: 'Next step', blurb: 'One concrete thing to do, and why it matters.', confirm: 'This will reveal your next step and why it matters. Continue?' },
+  { level: 'killer', label: 'Name the killer', blurb: "Just the name. You'll still need the evidence for the DA.", confirm: "This will reveal the killer's name. Continue?" },
+  { level: 'proof', label: 'Full proof', blurb: 'The whole chain of evidence and deductions.', confirm: 'This will reveal the full solution: every piece of evidence and every deduction. Continue?' },
+];
+
+function openHelp() {
+  helpShown = null;
+  openModal(() => {
+    const c = curCase();
+    let h = '<div class="kicker">Optional help</div><h2>Stuck?</h2>'
+      + '<p class="muted">Ask for as much as you need. Nothing changes the case: the DA still wants the evidence. Help you use is noted on the closed case.</p>'
+      + '<div class="diffs">' + HELP_LEVELS.map(l => `<button class="diff" data-act="help-reveal" data-level="${l.level}"><b>${l.label}</b><span>${esc(l.blurb)}</span></button>`).join('') + '</div>';
+    if (helpShown && helpShown.case === c.id) {
+      if (helpShown.level === 'step' && helpShown.hint) {
+        const hint = helpShown.hint;
+        h += `<div class="box"><b>Next step.</b> ${mk(hint.text)}${hint.reason ? `<p class="muted">${mk(hint.reason)}</p>` : ''}</div>`;
+      } else if (helpShown.level === 'killer') h += `<div class="box"><b>The killer is ${mk(`{p:${c.killer}}`)}.</b> Now prove it.</div>`;
+      else if (helpShown.level === 'proof') h += proofBox(c.proof, true);
+    }
+    return h;
+  }, null);
+}
+
+function revealHelp(level: HelpLevel) {
+  const c = curCase(), l = HELP_LEVELS.find(x => x.level === level)!;
+  if (c.solved || !confirm(l.confirm)) return;
+  recordHelp(level);
+  helpShown = { case: c.id, level, hint: level === 'step' ? nextStep() : undefined };
+  log(`Case #${c.id}: used help (${l.label.toLowerCase()}).`);
 }
 
 // ---------- Inspector
@@ -647,6 +683,8 @@ function handleAct(a: string, d: DOMStringMap, el: Element) {
       break;
     }
     case 'warrant': openWarrant(d.id!); return;
+    case 'open-help': openHelp(); return;
+    case 'help-reveal': revealHelp(d.level as HelpLevel); break;
     case 'warrant-submit': {
       const ids = [...document.querySelectorAll<HTMLInputElement>('[data-warrant-card]:checked')].map(x => x.dataset.warrantCard!);
       warrantRuling = evaluateWarrant(d.id!, ids);
