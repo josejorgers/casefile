@@ -352,6 +352,8 @@ The "Stuck? Get help" button offers three levels, each behind a confirmation: th
 
 **Next step** runs the omniscient analysis again, but with every piece of evidence the detective already holds (on the board, with its lab work done) costed at 0, via the `discount` hook of `analyse()`. The cheapest proof of `guilty(killer)` is then the one closest to the detective's board. A depth-first walk of that proof, prerequisites first, finds the first piece of evidence still missing and turns it into one concrete action: take an item, run a lab test, dust a spot, pin a print, ask a question, confront a statement with the cards that break it, or apply for a warrant (working towards the judge's two connections if the board doesn't have them yet). The reason comes from the rule that consumes the evidence and never names anyone. Statements from people who have lawyered up are left out, so the hint never points at something unreachable. When nothing is missing, the hint says to file with the DA and lists the cards.
 
+**Full proof** (`src/proof.ts`): the generator stores the proof as a `ProofNode` tree (`Case.proofTree`), which keeps each fact's evidence source. `explainProof` groups it by pillar, marks evidence (with the item and its spot and address, the question to ask, or the lab comparison) apart from deductions, and shows a shared fact once. Saves from before this get the tree built for open cases on load. Closed old cases keep the plain `Case.proof` lines, because once the killer is in custody the world no longer matches the case.
+
 The soundness test follows the hints alone with real game actions until the DA charges, and fails if a hint ever repeats without progress.
 
 ---

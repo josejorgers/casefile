@@ -4,6 +4,7 @@ import { IDENTIFYING, PILLAR_LABEL, evaluateWarrant, submitCase } from '../da';
 import type { Pillar, Verdict, WarrantRuling } from '../da';
 import { docText, plain } from '../docs';
 import { helpSummary, nextStep, recordHelp } from '../help';
+import { explainProof } from '../proof';
 import type { Hint, HelpLevel } from '../help';
 import type { ProofNode } from '../logic/engine';
 import { QUESTIONS, QUESTION_ORDER, STATEMENT_LABEL, ask, confront, hasWarrant, isLawyered, sid } from '../interview';
@@ -12,7 +13,8 @@ import {
   coronerReport, curCase, dustItem, dustSpot, findCard, fullName, itemAddr, knows, log, lookup, newWorld, person, printLabel,
   printWhere, readItem, removeCard, searchSpot, shortAddr, startNewCase, takeItem, visit,
 } from '../state';
-import type { Card, CardType, DifficultyId, Item, ItemKind, StatementKind } from '../types';
+import type { Card, CardType, Case, DifficultyId, Item, ItemKind, StatementKind } from '../types';
+import type { ProofLine } from '../proof';
 import { Board } from './board';
 import type { CardViewModel } from './board';
 
@@ -254,7 +256,7 @@ function renderReport() {
   if (c.solved) {
     el.innerHTML = `<div class="closed"><h2>Case #${c.id} closed</h2><p>${esc(fullName(c.killer))} has been charged with the murder of ${esc(fullName(c.victim))}.</p>`
       + `<p class="muted">DA submissions: ${c.attempts} · ${esc(helpSummary(c))}</p><button class="primary" data-act="pick-case">Take the next case</button></div>`
-      + proofBox(c.proof);
+      + proofBox(c);
     return;
   }
   const opts = (filter: (x: Card) => boolean, sel: string | null, placeholder = 'pick a card from your board') => `<option value="">— ${placeholder} —</option>`
@@ -279,7 +281,22 @@ function proofTree(n: ProofNode, depth = 0): string {
   const kids = n.children.length ? `<ul>${n.children.map(ch => `<li>${proofTree(ch, depth + 1)}</li>`).join('')}</ul>` : '';
   return `<span class="${n.children.length ? '' : 'leaf'}">${esc(n.text)}</span>${kids}`;
 }
-function proofBox(lines: string[], open = false): string {
+function proofBox(c: Case, open = false): string {
+  const sections = explainProof(c);
+  if (sections) {
+    const line = (l: ProofLine) => {
+      const pad = `style="margin-left:${l.depth * 16}px"`;
+      if (l.kind === 'evidence') return `<div class="pl ev" ${pad}><span class="pi">📄</span><div>${esc(l.text)}<div class="where">${mk(l.where || '')}</div></div></div>`;
+      if (l.kind === 'seen') return `<div class="pl seen" ${pad}><span class="pi">↑</span><div>${esc(l.text)} <span class="muted">(see above)</span></div></div>`;
+      return `<div class="pl ded" ${pad}><span class="pi">→</span><div>${esc(l.text)}</div></div>`;
+    };
+    return `<details class="proof"${open ? ' open' : ''}><summary>The shortest proof that existed</summary>`
+      + '<p class="muted legend">📄 evidence, with where to find it · → a deduction from what is under it</p>'
+      + sections.map(sec => `<div class="psec"><h4>${esc(sec.title)}</h4><p class="how">${esc(sec.how)}</p>`
+        + `<div class="plines">${sec.lines.map(line).join('')}</div>${sec.lines.some(l => l.text === sec.conclusion) ? '' : `<div class="pcon">⇒ ${esc(sec.conclusion)}</div>`}</div>`).join('')
+      + `<div class="pcon final">⇒ ${esc(fullName(c.killer))} killed ${esc(fullName(c.victim))}: three of the four pillars, including Means or Presence.</div></details>`;
+  }
+  const lines = c.proof;
   if (!lines.length) return '';
   return `<details class="proof"${open ? ' open' : ''}><summary>The shortest proof that existed</summary><div class="lines">${lines.map(l => {
     const depth = l.length - l.trimStart().length;
@@ -302,7 +319,7 @@ function showVerdict(r: Verdict) {
     const k = person(c.killer);
     h += `<div class="box"><b>What happened.</b> ${esc(fullName(c.killer))} killed ${esc(fullName(c.victim))} at about ${fmtTime(c.time)} with a ${esc(c.weaponName.toLowerCase())}. Motive: ${MOTIVE_LABEL[c.motive]}.`
       + ` ${cap(pron(k).subj)} is now in custody. Submissions to the DA: ${c.attempts}. ${esc(helpSummary(c))}</div>`
-      + proofBox(c.proof)
+      + proofBox(c)
       + '<div class="row"><button class="primary" data-act="pick-case">Take the next case</button></div>';
   } else h += '<p class="muted">The DA needs 3 of the 4 pillars. Keep investigating.</p>';
   openModal(() => h, null);
@@ -350,7 +367,7 @@ function openHelp() {
         const hint = helpShown.hint;
         h += `<div class="box"><b>Next step.</b> ${mk(hint.text)}${hint.reason ? `<p class="muted">${mk(hint.reason)}</p>` : ''}</div>`;
       } else if (helpShown.level === 'killer') h += `<div class="box"><b>The killer is ${mk(`{p:${c.killer}}`)}.</b> Now prove it.</div>`;
-      else if (helpShown.level === 'proof') h += proofBox(c.proof, true);
+      else if (helpShown.level === 'proof') h += proofBox(c, true);
     }
     return h;
   }, null);

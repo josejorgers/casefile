@@ -17,7 +17,7 @@ Crimes are described in a small **case language**: facts (`claim(P, place, from,
 2. **Builds the world around it.** Everyone's timeline for the night, the traces at the scene, the records (tab books, timesheets, call logs, tickets), the lies and rumours. Honest statements are read straight off the timelines, so they never contradict a record.
 3. **Checks the whole world** with the same rules (`checkCase`): the killer must be provable, nobody else may be, the dropped pillar must really be unprovable, and the *shortest* proof must cost at least the difficulty's minimum. Otherwise it rolls again.
 
-The DA, the judge and confrontations all run the same rules over the cards you submit, so anything the language can derive, the game understands. Once a case is closed you can see the shortest proof that existed.
+The DA, the judge and confrontations all run the same rules over the cards you submit, so anything the language can derive, the game understands. Once a case is closed you can see the shortest proof that existed, grouped by the DA's pillars, with every piece of evidence marked with what it is and where to find it.
 
 **Stuck?** An optional help button offers, each behind a confirmation: the next step and why it matters (computed from the cheapest proof given what's already on your board), the killer's name, or the full proof. The DA still needs the evidence; help used is noted on the closed case.
 
@@ -58,6 +58,7 @@ The DA, the judge and confrontations all run the same rules over the cards you s
 - `src/interview.ts`: questions, statements, confrontation
 - `src/da.ts`: the DA's verdict and the judge's warrants
 - `src/help.ts`: optional help (next step, killer, full proof)
+- `src/proof.ts`: the shortest proof explained for the player (pillars, evidence locations)
 - `src/ui/board.ts`, `src/ui/view.ts`: the corkboard and the rest of the UI
 
 ## Contributing

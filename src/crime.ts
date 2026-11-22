@@ -6,6 +6,7 @@ import { CLOCKED, DIFFICULTIES, DRINKS, GUNS, KNIFE_BRANDS, MELEE, RNG, cap, fmt
 import type { Rng } from './data';
 import { analyse, omniscientEvidence } from './logic/analyse';
 import { explain, proofLines } from './logic/engine';
+import type { ProofNode } from './logic/engine';
 import { connections } from './logic/rules';
 import { CLAIM_FROM, EVE, MORNING, defaultTimeline, overlay, placeAt, timeline, workSegs } from './story';
 import { addContact, addItem, giveGun, moveItem } from './world';
@@ -13,7 +14,7 @@ import type {
   Case, Difficulty, DifficultyId, Item, MeansStrat, Motive, MotiveStrat, OppStrat, Person, Plan, PresenceStrat, Seg, World,
 } from './types';
 
-export interface CaseCheck { ok: boolean; why: string; cost: number; proof: string[] }
+export interface CaseCheck { ok: boolean; why: string; cost: number; proof: string[]; tree?: ProofNode }
 
 /** Why generated cases were rejected (for tuning and tests). */
 export const rejections: Record<string, number> = {};
@@ -27,7 +28,7 @@ export function generateCase(W: World, diffId: DifficultyId): Case | null {
     if (c) {
       W.cases.push(c);
       const chk = checkCase(W, c);
-      if (chk.ok) { c.proof = chk.proof; c.minCost = chk.cost; W.rngState = rng.state(); return c; }
+      if (chk.ok) { c.proof = chk.proof; c.proofTree = chk.tree; c.minCost = chk.cost; W.rngState = rng.state(); return c; }
       const why = chk.why.replace(/ \(.*\)$/, '').replace(/innocent \S+/, 'innocent');
       rejections[why] = (rejections[why] || 0) + 1;
     } else rejections['no victim/killer'] = (rejections['no victim/killer'] || 0) + 1;
@@ -53,7 +54,8 @@ export function checkCase(W: World, c: Case): CaseCheck {
   if (!pl.motive.length && db.get('motive', c.killer)) return fail('dropped motive is provable');
   if (!pl.opp && db.get('opportunity', c.killer)) return fail('dropped opportunity is provable');
   if (c.refusers.includes(c.killer) && connections(db, c.killer).length < 2) return fail('no warrant possible');
-  return { ok: true, why: '', cost: g.cost, proof: proofLines(explain(db, g.key)) };
+  const tree = explain(db, g.key)!;
+  return { ok: true, why: '', cost: g.cost, proof: proofLines(tree), tree };
 }
 
 const seg = (place: string | null, from: number, to: number): Seg => ({ place, from, to });

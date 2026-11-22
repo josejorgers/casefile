@@ -1,4 +1,5 @@
 // Shared model types. `World` is the hidden truth; `Knowledge` is what the detective has learned.
+import type { ProofNode } from './logic/engine';
 
 export type Shift = [number, number]; // [startHour, endHour]; end <= start means it runs past midnight
 export type BizType = 'diner' | 'bar' | 'office' | 'factory' | 'clinic' | 'shop' | 'gunshop' | 'pawnshop' | 'cobbler';
@@ -127,6 +128,8 @@ export interface Case {
   timesheets: Record<string, string>; // business address -> timesheet item
   /** The shortest proof of guilt that exists in the world, rendered as indented lines (shown once the case is closed). */
   proof: string[];
+  /** The same proof as a tree that keeps each fact's evidence source (for the explained proof view). */
+  proofTree?: ProofNode;
   minCost: number;
   /** Optional help the detective used on this case (next-step hints, killer revealed, full proof revealed). */
   help?: { steps: number; killer: boolean; proof: boolean };

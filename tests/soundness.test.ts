@@ -4,13 +4,15 @@
 //  2. Play-through: a detective who follows the shortest proof using real game actions (taking items, lab work,
 //     asking, confronting with cards, warrants) gets charges filed by the DA.
 //  3. The same detective, naming each innocent person instead with every card they gathered, never succeeds.
-//  4. Optional help: a detective who only follows the "next step" hints gets charges filed, and no hint ever
+//  4. The explained proof covers the victim and 3+ pillars, and every piece of evidence says where to find it.
+//  5. Optional help: a detective who only follows the "next step" hints gets charges filed, and no hint ever
 //     points at something unreachable or repeats without progress.
 import { describe, expect, it } from 'vitest';
 import { checkCase } from '../src/crime';
 import { DIFFICULTIES } from '../src/data';
 import { evaluateCase, evaluateWarrant, submitCase } from '../src/da';
 import { nextStep } from '../src/help';
+import { explainProof } from '../src/proof';
 import { ask, confront } from '../src/interview';
 import { analyse, omniscientEvidence } from '../src/logic/analyse';
 import { sources } from '../src/logic/engine';
@@ -98,6 +100,11 @@ describe('Case soundness', () => {
           const chk = checkCase(JSON.parse(JSON.stringify(W)), JSON.parse(JSON.stringify(c)));
           expect(chk.ok, `seed ${seed} case ${c.id}: ${chk.why}`).toBe(true);
           expect(chk.cost).toBeGreaterThanOrEqual(DIFFICULTIES[diff].minCost);
+          // the explained proof: victim plus 3+ pillars, and every piece of evidence says where to find it
+          const secs = explainProof(c);
+          expect(secs, `seed ${seed} case ${c.id}: no explained proof`).toBeTruthy();
+          expect(secs!.filter(x => x.title !== 'Victim').length).toBeGreaterThanOrEqual(3);
+          for (const l of secs!.flatMap(x => x.lines)) if (l.kind === 'evidence') expect(l.where, `seed ${seed}: no location for "${l.text}"`).toBeTruthy();
 
           // 2. play the shortest proof
           const evidence = playShortestProof();
